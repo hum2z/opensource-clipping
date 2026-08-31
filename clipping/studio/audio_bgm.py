@@ -22,11 +22,31 @@ def get_local_bgm_file(mood, bgm_dir):
     mood_dir = os.path.join(bgm_dir, mood)
 
     if not os.path.exists(mood_dir) or not os.path.isdir(mood_dir):
-        return None
+        # An unknown mood used to return None silently, so the clip rendered
+        # with no music and no explanation. This happens whenever the AI
+        # response is hand-authored or comes from a provider that ignores the
+        # bgm_mood enum. Say so, and fall back to a mood that exists.
+        try:
+            available = sorted(
+                d for d in os.listdir(bgm_dir)
+                if os.path.isdir(os.path.join(bgm_dir, d))
+            )
+        except OSError:
+            available = []
+        if not available:
+            print(f"   ⚠️ [BGM] Tidak ada folder mood di {bgm_dir}. BGM dilewati.")
+            return None
+        fallback = "chill" if "chill" in available else available[0]
+        print(
+            f"   ⚠️ [BGM] Mood '{mood}' tidak dikenal. "
+            f"Tersedia: {', '.join(available)}. Memakai '{fallback}'."
+        )
+        mood_dir = os.path.join(bgm_dir, fallback)
 
     mp3_files = [f for f in os.listdir(mood_dir) if f.lower().endswith(".mp3")]
 
     if not mp3_files:
+        print(f"   ⚠️ [BGM] Folder '{os.path.basename(mood_dir)}' kosong. BGM dilewati.")
         return None
 
     selected_file = random.choice(mp3_files)
