@@ -50,6 +50,14 @@ run_ffmpeg_with_progress = _ffmpeg_utils.run_ffmpeg_with_progress
 USED_PEXELS_IDS = set()
 
 
+class _PoolSize:
+    """Holds the b-roll relevance-pool size (see ``--broll-pool``)."""
+    value = 5
+
+
+cfg_pool = _PoolSize()
+
+
 def download_pexels_broll(query, rasio, output_filename, pexels_api_key):
     """
     Search and download one Pexels B-roll video clip matching the query and aspect ratio.
@@ -80,13 +88,17 @@ def download_pexels_broll(query, rasio, output_filename, pexels_api_key):
 
     orientation = "portrait" if _is_vertical_ratio(rasio) else "landscape"
 
+    # Deliberately no "size"/"resolution_name" filter. Both prune the result
+    # set before relevance is applied — for "courthouse building exterior" they
+    # cut 8000 matches down to 384 and pushed a football stadium and an
+    # Istanbul mosque into the top five. Resolution is already handled properly
+    # below, where the best rendition of the chosen video is selected from its
+    # video_files, so filtering here only costs relevance.
     params = urllib.parse.urlencode(
         {
             "query": query,
             "orientation": orientation,
             "per_page": 30,
-            "size": "large",
-            "resolution_name": "1080p",
         }
     )
     search_url = f"https://api.pexels.com/videos/search?{params}"
@@ -110,10 +122,21 @@ def download_pexels_broll(query, rasio, output_filename, pexels_api_key):
         print(f"   ⚠️ Pexels tidak menemukan video untuk '{query}'.")
         return False
 
-    available_videos = [v for v in data["videos"] if v["id"] not in USED_PEXELS_IDS]
+    # Pexels returns results in relevance order. Sampling uniformly across all
+    # 30 throws that ranking away: for "police officer uniform closeup" the top
+    # hit is a police officer, while results far down the list are only loosely
+    # tagged and can be wildly off-topic. Unrelated b-roll under a specific
+    # claim is worse than no b-roll, so restrict the draw to the most relevant
+    # few and keep just enough randomness to avoid repeating shots across clips.
+    pool_size = max(1, int(getattr(cfg_pool, "value", 5)))
+    ranked = data["videos"][:pool_size]
+    available_videos = [v for v in ranked if v["id"] not in USED_PEXELS_IDS]
+    if not available_videos:
+        # Widen to the full result set before giving up on novelty.
+        available_videos = [v for v in data["videos"] if v["id"] not in USED_PEXELS_IDS]
     if not available_videos:
         print(f"   🔄 B-roll pool untuk '{query}' habis, me-reset.")
-        available_videos = data["videos"]
+        available_videos = ranked or data["videos"]
 
     video_data = random.choice(available_videos)
     USED_PEXELS_IDS.add(video_data["id"])
@@ -127,13 +150,14 @@ def download_pexels_broll(query, rasio, output_filename, pexels_api_key):
         print(f"   ⚠️ Tidak ada file MP4 di dalam data video '{query}'.")
         return False
 
-    video_files.sort(
-        key=lambda vf: (
-            vf.get("quality") != "hd",
-            -(vf.get("width") or 0),
-            -(vf.get("height") or 0),
-        )
-    )
+    # Prefer the smallest rendition that still covers 1080p, falling back to
+    # the largest available. Grabbing the biggest file wastes bandwidth on 4K
+    # sources that get scaled down to the render height anyway.
+    def _rendition_rank(vf):
+        h = vf.get("height") or 0
+        return (0, h) if h >= 1080 else (1, -h)
+
+    video_files.sort(key=_rendition_rank)
 
     download_url = video_files[0]["link"]
     download_req = urllib.request.Request(

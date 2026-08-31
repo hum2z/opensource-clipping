@@ -239,6 +239,7 @@ def proses_klip(
     broll_aktif = []
     if cfg.use_broll and broll_list:
         print(f"   🎥 Mendownload {len(broll_list)} video B-Roll dari Pexels...")
+        broll.cfg_pool.value = getattr(cfg, "broll_pool", 5)
         for i, br in enumerate(broll_list):
             q = br.get("search_query", "nature")
             file_broll = f"temp_broll_{rank}_{i}.mp4"
@@ -555,7 +556,7 @@ def proses_klip(
             file_bgm = None
             if aktif_bgm:
                 print(f"   🎵 Mencari file BGM lokal (Mood: {bgm_mood})...")
-                file_bgm = get_local_bgm_file(bgm_mood, getattr(cfg, "bgm_dir", os.path.join(cfg.base_dir, "assets", "bgm")))
+                file_bgm = get_local_bgm_file(bgm_mood, getattr(cfg, "bgm_dir", os.path.join(cfg.base_dir, "assets", "bgm")), getattr(cfg, "bgm_file", None))
                 if not file_bgm and bgm_mood != "chill":
                     print("   🔄 Fallback mencari BGM chill...")
                     file_bgm = get_local_bgm_file("chill", getattr(cfg, "bgm_dir", os.path.join(cfg.base_dir, "assets", "bgm")))
@@ -660,7 +661,7 @@ def proses_klip(
             file_bgm = None
             if aktif_bgm:
                 print(f"   🎵 Mencari file BGM lokal (Mood: {bgm_mood})...")
-                file_bgm = get_local_bgm_file(bgm_mood, getattr(cfg, "bgm_dir", os.path.join(cfg.base_dir, "assets", "bgm")))
+                file_bgm = get_local_bgm_file(bgm_mood, getattr(cfg, "bgm_dir", os.path.join(cfg.base_dir, "assets", "bgm")), getattr(cfg, "bgm_file", None))
                 if not file_bgm and bgm_mood != "chill":
                     print("   🔄 Fallback mencari BGM chill...")
                     file_bgm = get_local_bgm_file("chill", getattr(cfg, "bgm_dir", os.path.join(cfg.base_dir, "assets", "bgm")))

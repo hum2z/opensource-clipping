@@ -367,6 +367,26 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-hook", action="store_true", help="Disable hook glitch teaser")
     p.add_argument("--no-bgm", action="store_true", help="Disable background music")
     p.add_argument(
+        "--broll-pool",
+        type=int,
+        default=5,
+        help=(
+            "How many of Pexels' top-ranked results a b-roll clip may be drawn "
+            "from (default: 5). Larger values add variety at the cost of "
+            "relevance; results far down the list are only loosely tagged."
+        ),
+    )
+    p.add_argument(
+        "--bgm-file",
+        default="",
+        help=(
+            "Use this exact music file instead of picking at random from the "
+            "mood folder. Mood folders mix tones — a 'suspense' folder can hold "
+            "both a cinematic bed and a horror music box — so pin the track when "
+            "tone matters."
+        ),
+    )
+    p.add_argument(
         "--bgm-mode",
         choices=["ducking", "background"],
         default=BGM_MODE,
@@ -963,6 +983,8 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         # BGM
         bgm_base_volume=BGM_BASE_VOLUME,
         bgm_mode=args.bgm_mode,
+        bgm_file=args.bgm_file or None,
+        broll_pool=args.broll_pool,
         bgm_moods=BGM_MOODS,
         bgm_dir=BGM_DIR,
         # Whisper

@@ -8,17 +8,30 @@ import os
 import random
 
 
-def get_local_bgm_file(mood, bgm_dir):
+def get_local_bgm_file(mood, bgm_dir, bgm_file=None):
     """
     Get a random BGM MP3 file from the local assets directory based on mood.
 
     Args:
         mood (str): The requested mood (e.g., 'chill', 'epic', 'sad').
         bgm_dir (str): Base directory for BGM assets.
+        bgm_file (str, optional): Explicit path to a music file. When given it
+            wins over the mood lookup, so tone is deterministic instead of a
+            random draw from a folder that may mix moods.
 
     Returns:
         str: Absolute path to the selected MP3 file, or None if not found/empty.
     """
+    if bgm_file:
+        cand = os.path.expanduser(bgm_file)
+        if not os.path.isabs(cand):
+            alt = os.path.join(bgm_dir, cand)
+            cand = alt if os.path.exists(alt) else cand
+        if os.path.exists(cand):
+            print(f"   🎵 BGM eksplisit: {os.path.basename(cand)}", flush=True)
+            return os.path.abspath(cand)
+        print(f"   ⚠️ [BGM] File '{bgm_file}' tidak ditemukan. Fallback ke mood.", flush=True)
+
     mood_dir = os.path.join(bgm_dir, mood)
 
     if not os.path.exists(mood_dir) or not os.path.isdir(mood_dir):
