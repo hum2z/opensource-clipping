@@ -42,6 +42,7 @@ def run_pipeline(cfg) -> list[dict]:
         getattr(cfg, "use_dlp_subs", False),
         getattr(cfg, "download_source_height", "max"),
         source_platform=source_platform,
+        **engine.build_download_opts(cfg),
     )
 
     # Step 2 — Transcribe

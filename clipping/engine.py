@@ -121,12 +121,62 @@ def _ydl_progress_hook(d: dict) -> None:
         print(flush=True)  # tutup baris bar untuk stream ini
 
 
+# Default YouTube player clients. ``android`` and the plain ``web`` client are
+# both aggressively bot-checked now; these two negotiate media formats far more
+# reliably while still working without cookies on clean IPs.
+DEFAULT_YT_PLAYER_CLIENT = "tv,web_safari"
+
+
+def _apply_auth_opts(
+    ydl_opts: dict,
+    cookies_file: str | None,
+    cookies_from_browser: str | None,
+) -> None:
+    """Attach cookie options to *ydl_opts*, preferring an explicit cookies file."""
+    if cookies_file:
+        expanded = os.path.expanduser(cookies_file)
+        if not os.path.exists(expanded):
+            raise FileNotFoundError(
+                f"❌ Cookies file tidak ditemukan: {expanded}\n"
+                "   Export dengan ekstensi 'Get cookies.txt LOCALLY' (format Netscape)."
+            )
+        ydl_opts["cookiefile"] = expanded
+        print(f"      🍪 Memakai cookies file: {expanded}", flush=True)
+    elif cookies_from_browser:
+        # yt-dlp expects a tuple: (browser, profile, keyring, container)
+        parts = cookies_from_browser.split(":")
+        browser = parts[0]
+        profile = parts[1] if len(parts) > 1 and parts[1] else None
+        ydl_opts["cookiesfrombrowser"] = (browser, profile, None, None)
+        print(f"      🍪 Memakai cookies dari browser: {cookies_from_browser}", flush=True)
+
+
+def build_download_opts(cfg) -> dict:
+    """Collect yt-dlp auth/extraction options from *cfg* into kwargs.
+
+    Shared by the auto-clip runner, story runner and the web worker so all
+    entry points honour the same cookie / PO-token / player-client settings.
+    """
+    return {
+        "cookies_file": getattr(cfg, "cookies_file", None),
+        "cookies_from_browser": getattr(cfg, "cookies_from_browser", None),
+        "player_client": getattr(cfg, "player_client", None),
+        "pot_base_url": getattr(cfg, "pot_base_url", None),
+        "js_runtimes": getattr(cfg, "js_runtimes", None),
+    }
+
+
 def download_video(
     url: str,
     output_path: str,
     use_dlp_subs: bool = False,
     download_source_height: str | int = "max",
     source_platform: str = "youtube",
+    cookies_file: str | None = None,
+    cookies_from_browser: str | None = None,
+    player_client: str | None = None,
+    pot_base_url: str | None = None,
+    js_runtimes: str | None = None,
 ) -> None:
     """
     Download a video to *output_path* with configurable source height.
@@ -136,6 +186,23 @@ def download_video(
     source_platform : str
         One of ``"youtube"`` (default), ``"tiktok"``, ``"instagram"``,
         or ``"gdrive"``.
+    cookies_file : str | None
+        Path to a Netscape-format ``cookies.txt``. Required for age-gated
+        videos and for any host that YouTube flags with
+        "Sign in to confirm you're not a bot" (common on datacenter/VPS IPs).
+    cookies_from_browser : str | None
+        yt-dlp browser spec (e.g. ``"chrome"``, ``"firefox:default"``) to read
+        cookies straight from a local browser profile. Ignored when
+        *cookies_file* is set.
+    player_client : str | None
+        Override the YouTube ``player_client`` list. Defaults to
+        :data:`DEFAULT_YT_PLAYER_CLIENT`.
+    pot_base_url : str | None
+        Base URL of a bgutil PO-token provider (e.g. ``http://127.0.0.1:4416``).
+        YouTube increasingly requires a PO token to serve real media formats;
+        without one only storyboard images may be offered.
+    js_runtimes : str | None
+        JS runtime for signature deciphering, passed to yt-dlp (e.g. ``"deno"``).
     """
     platform_label = _PLATFORM_LABELS.get(source_platform, source_platform)
     uses_youtube_format = source_platform == "youtube"
@@ -159,6 +226,13 @@ def download_video(
     # --- Build yt-dlp options per platform ---
     if uses_youtube_format:
         # YouTube: complex format selector + AV1 filter + remote components
+        extractor_args = {
+            "youtube": [f"player_client={player_client or DEFAULT_YT_PLAYER_CLIENT}"]
+        }
+        if pot_base_url:
+            extractor_args["youtubepot-bgutilhttp"] = [f"base_url={pot_base_url}"]
+            print(f"      🔑 PO token provider: {pot_base_url}", flush=True)
+
         ydl_opts = {
             "format": _build_ydl_format_selector(download_source_height),
             "outtmpl": output_path,
@@ -166,8 +240,10 @@ def download_video(
             "merge_output_format": "mp4",
             "remote_components": ["ejs:github"],
             "progress_hooks": [_ydl_progress_hook],
-            "extractor_args": {"youtube": ["player_client=android,web"]},
+            "extractor_args": extractor_args,
         }
+        if js_runtimes:
+            ydl_opts["js_runtimes"] = [r.strip() for r in js_runtimes.split(",") if r.strip()]
     else:
         # TikTok / Instagram: ensure video and audio are merged
         # We explicitly prefer H.264 over H.265 (TikTok's bytevc1) to prevent 
@@ -179,6 +255,9 @@ def download_video(
             "merge_output_format": "mp4",
             "progress_hooks": [_ydl_progress_hook],
         }
+
+    # Cookies apply to every yt-dlp based platform (YouTube / TikTok / Instagram).
+    _apply_auth_opts(ydl_opts, cookies_file, cookies_from_browser)
 
     # --- Subtitle download — only supported for YouTube ---
     if use_dlp_subs and uses_youtube_format:

@@ -113,6 +113,7 @@ def _run_pipeline_sync(job_id: str, payload: dict) -> None:
                     getattr(cfg, "use_dlp_subs", False),
                     getattr(cfg, "download_source_height", "max"),
                     source_platform=source_platform,
+                    **engine.build_download_opts(cfg),
                 )
                 store.update_progress(
                     job_id,

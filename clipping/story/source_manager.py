@@ -32,6 +32,7 @@ def _download_single_source(
     source: dict,
     cache_dir: str,
     download_source_height: str | int = "max",
+    download_opts: dict | None = None,
 ) -> str:
     """
     Download a single source video and cache it.
@@ -45,6 +46,9 @@ def _download_single_source(
         Directory to cache downloaded files.
     download_source_height : str | int
         Desired download resolution (passed to ``engine.download_video``).
+    download_opts : dict | None
+        Extra yt-dlp options (cookies, player_client, PO token, JS runtime)
+        forwarded to ``engine.download_video``.
 
     Returns
     -------
@@ -87,6 +91,7 @@ def _download_single_source(
         use_dlp_subs=False,  # No subtitle download for story sources
         download_source_height=download_source_height,
         source_platform=platform,
+        **(download_opts or {}),
     )
 
     if not os.path.exists(cached_path):
@@ -108,6 +113,7 @@ def download_all_sources(
     source_registry: dict[str, dict],
     cache_dir: str,
     download_source_height: str | int = "max",
+    download_opts: dict | None = None,
 ) -> dict[str, str]:
     """
     Download all sources listed in the registry.
@@ -120,6 +126,9 @@ def download_all_sources(
         Directory to cache downloaded files.
     download_source_height : str | int
         Desired download resolution.
+    download_opts : dict | None
+        Extra yt-dlp options (cookies, player_client, PO token, JS runtime)
+        forwarded to ``engine.download_video``.
 
     Returns
     -------
@@ -136,7 +145,7 @@ def download_all_sources(
         print(f"[{idx}/{total}] Source: {source.get('name', sid)}")
         try:
             path = _download_single_source(
-                source, cache_dir, download_source_height
+                source, cache_dir, download_source_height, download_opts
             )
             paths[sid] = path
         except Exception as e:

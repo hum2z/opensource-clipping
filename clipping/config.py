@@ -40,6 +40,11 @@ SWITCH_BLEND_DURATION = 0.0  # 0 = instant snap, >0 = smooth blend in seconds
 # Source Platform
 SOURCE_PLATFORM = "youtube"
 
+# Default yt-dlp YouTube player clients (kept in sync with clipping.engine).
+# ``android`` / plain ``web`` are heavily bot-checked; these negotiate media
+# formats far more reliably.
+DEFAULT_YT_PLAYER_CLIENT = "tv,web_safari"
+
 # 3. PENGATURAN SUBTITLE & TIPOGRAFI (ASS STYLE)
 USE_ADVANCED_TEXT = False
 USE_ADVANCED_TEXT_ON_HOOK = False
@@ -233,6 +238,49 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_parse_download_height,
         default=DOWNLOAD_SOURCE_HEIGHT,
         help="Preferred source download max height. Use 'max' to fetch highest available quality.",
+    )
+    p.add_argument(
+        "--cookies",
+        default=os.environ.get("YTDLP_COOKIES", ""),
+        help=(
+            "Path to a Netscape-format cookies.txt for yt-dlp. Needed for age-gated "
+            "videos and whenever YouTube answers 'Sign in to confirm you're not a bot' "
+            "(common on VPS/cloud IPs). Env: YTDLP_COOKIES"
+        ),
+    )
+    p.add_argument(
+        "--cookies-from-browser",
+        default=os.environ.get("YTDLP_COOKIES_FROM_BROWSER", ""),
+        help=(
+            "Read cookies directly from a local browser profile, e.g. 'chrome' or "
+            "'firefox:default'. Ignored when --cookies is given. "
+            "Env: YTDLP_COOKIES_FROM_BROWSER"
+        ),
+    )
+    p.add_argument(
+        "--player-client",
+        default=os.environ.get("YTDLP_PLAYER_CLIENT", ""),
+        help=(
+            "Override yt-dlp YouTube player_client list "
+            f"(default: {DEFAULT_YT_PLAYER_CLIENT}). Env: YTDLP_PLAYER_CLIENT"
+        ),
+    )
+    p.add_argument(
+        "--pot-base-url",
+        default=os.environ.get("YTDLP_POT_BASE_URL", ""),
+        help=(
+            "Base URL of a bgutil PO-token provider, e.g. http://127.0.0.1:4416. "
+            "YouTube often serves only storyboard images without a PO token. "
+            "Env: YTDLP_POT_BASE_URL"
+        ),
+    )
+    p.add_argument(
+        "--js-runtimes",
+        default=os.environ.get("YTDLP_JS_RUNTIMES", ""),
+        help=(
+            "JS runtime used by yt-dlp for signature deciphering, e.g. 'deno'. "
+            "Env: YTDLP_JS_RUNTIMES"
+        ),
     )
     p.add_argument(
         "--render-height",
@@ -801,6 +849,11 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         jumlah_clip=args.clips,
         pilihan_rasio=args.ratio,
         download_source_height=args.source_height,
+        cookies_file=args.cookies or None,
+        cookies_from_browser=args.cookies_from_browser or None,
+        player_client=args.player_client or None,
+        pot_base_url=args.pot_base_url or None,
+        js_runtimes=args.js_runtimes or None,
         render_output_height=args.render_height,
         # Konten & Hook
         max_kata_per_subtitle=args.words_per_sub,

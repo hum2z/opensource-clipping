@@ -159,8 +159,13 @@ def run_story_pipeline(cfg) -> list[dict]:
     else:
         print(f"\n[2/6] Downloading sources → {cache_dir}")
         download_height = getattr(cfg, "download_source_height", "max")
+        from . import engine
+
         cached_paths = source_manager.download_all_sources(
-            source_registry, cache_dir, download_height
+            source_registry,
+            cache_dir,
+            download_height,
+            download_opts=engine.build_download_opts(cfg),
         )
 
     # Save download status
