@@ -83,10 +83,14 @@ DAFTAR_FONT = {
     },
     "HORMOZI": {
         "utama": {
+            # Hormozi-style captions are heavy-weight. The fontsource 400 build
+            # also self-reports its family as "Montserrat Thin", which libass
+            # could not match against the declared "Montserrat" — it silently
+            # fell back to DejaVu Sans. This build reports "Montserrat"/"Black".
             "nama": "Montserrat",
-            "file": "Montserrat-Regular.ttf",
-            "url": "https://cdn.jsdelivr.net/fontsource/fonts/montserrat@latest/latin-400-normal.ttf",
-            "bold": 0,
+            "file": "Montserrat-Black.ttf",
+            "url": "https://raw.githubusercontent.com/JulietaUla/Montserrat/master/fonts/ttf/Montserrat-Black.ttf",
+            "bold": 1,
         },
         "khusus": {
             "nama": "Anton",
@@ -128,8 +132,11 @@ WARNA_KATA_KHUSUS = "&HFFFFFF&"
 
 # 4. PENGATURAN ASSET EKSTERNAL
 NAMA_FONT_THUMBNAIL = "Montserrat-Black.ttf"
+# Use raw.githubusercontent.com (same host as DAFTAR_FONT below). The
+# github.com/<user>/<repo>/raw/... form issues a redirect that some proxies and
+# corporate networks answer with 403, which previously failed thumbnail render.
 URL_FONT_THUMBNAIL = (
-    "https://github.com/JulietaUla/Montserrat/raw/master/fonts/ttf/Montserrat-Black.ttf"
+    "https://raw.githubusercontent.com/JulietaUla/Montserrat/master/fonts/ttf/Montserrat-Black.ttf"
 )
 
 URL_GLITCH_VIDEO = "https://www.youtube.com/watch?v=5nBcNRYmjs0"

@@ -51,6 +51,7 @@ typography = _load_studio_internal_module("typography.py", "clipping_studio_typo
 download_google_font = typography.download_google_font
 register_fonts_for_libass = typography.register_fonts_for_libass
 siapkan_font_tipografi = typography.siapkan_font_tipografi
+resolve_font_family = typography.resolve_font_family
 
 def buat_file_ass(
     data_segmen,
@@ -109,8 +110,15 @@ def buat_file_ass(
     font_utama_dict = daftar_font[gaya]["utama"]
     font_khusus_dict = daftar_font[gaya]["khusus"]
 
-    font_utama = font_utama_dict["nama"]
-    font_khusus = font_khusus_dict["nama"]
+    # Resolve against the real family name inside each downloaded file — the
+    # declared "nama" can disagree with it, which makes libass fall back to a
+    # default system font and render the clip in the wrong typeface.
+    font_utama = resolve_font_family(
+        font_dir, font_utama_dict.get("file", ""), font_utama_dict["nama"]
+    )
+    font_khusus = resolve_font_family(
+        font_dir, font_khusus_dict.get("file", ""), font_khusus_dict["nama"]
+    )
 
     scale_base_khusus = (
         cfg.scale_kata_khusus_916 if _is_vertical_ratio(rasio) else cfg.scale_kata_khusus_169
@@ -222,7 +230,10 @@ def buat_file_ass(
         return font_cache[key]
 
     def build_font_tag(font_info):
-        nama = str(font_info["nama"]).replace("{", "").replace("}", "").strip()
+        nama = resolve_font_family(
+            font_dir, font_info.get("file", ""), font_info["nama"]
+        )
+        nama = str(nama).replace("{", "").replace("}", "").strip()
         bold = 1 if int(font_info.get("bold", 0)) else 0
         return f"\\fn{nama}\\b{bold}"
 

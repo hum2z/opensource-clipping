@@ -67,7 +67,17 @@ def buat_thumbnail(video_path, output_image_path, teks, cfg):
         Exception: If image processing or saving fails.
     """
     if not os.path.exists(cfg.file_font_thumbnail):
-        urllib.request.urlretrieve(cfg.url_font_thumbnail, cfg.file_font_thumbnail)
+        # A thumbnail is a nice-to-have; never let a font CDN hiccup sink an
+        # otherwise successful render.
+        try:
+            urllib.request.urlretrieve(cfg.url_font_thumbnail, cfg.file_font_thumbnail)
+        except Exception as e:
+            print(
+                f"   ⚠️ [Thumbnail] Gagal mengunduh font ({e}). "
+                "Melewati pembuatan thumbnail.",
+                flush=True,
+            )
+            return None
 
     cap = cv2.VideoCapture(video_path)
     cap.set(cv2.CAP_PROP_POS_MSEC, 5000)

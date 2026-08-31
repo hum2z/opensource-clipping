@@ -36,14 +36,21 @@ def run_pipeline(cfg) -> list[dict]:
 
     # Step 1 — Download
     source_platform = getattr(cfg, "source_platform", "youtube")
-    engine.download_video(
-        cfg.url_youtube,
-        cfg.file_video_asli,
-        getattr(cfg, "use_dlp_subs", False),
-        getattr(cfg, "download_source_height", "max"),
-        source_platform=source_platform,
-        **engine.build_download_opts(cfg),
-    )
+    if getattr(cfg, "skip_download", False) and os.path.exists(cfg.file_video_asli):
+        size_mb = os.path.getsize(cfg.file_video_asli) / 1048576
+        print(
+            f"[1/3] ⏭️  Skip download — memakai file lokal: "
+            f"{cfg.file_video_asli} ({size_mb:.1f} MB)"
+        )
+    else:
+        engine.download_video(
+            cfg.url_youtube,
+            cfg.file_video_asli,
+            getattr(cfg, "use_dlp_subs", False),
+            getattr(cfg, "download_source_height", "max"),
+            source_platform=source_platform,
+            **engine.build_download_opts(cfg),
+        )
 
     # Step 2 — Transcribe
     transkrip_lengkap = ""

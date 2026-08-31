@@ -187,6 +187,30 @@ def register_fonts_for_libass(font_dir):
         )
 
 
+def resolve_font_family(font_dir, file_name, declared_name):
+    """Return the font family name libass will actually match.
+
+    The ``nama`` field in ``DAFTAR_FONT`` is a human label and can disagree with
+    the family name stored inside the downloaded file — the fontsource CDN build
+    of ``Montserrat-Regular.ttf``, for example, reports ``Montserrat Thin``.
+    libass resolves styles by family name, so a mismatch silently falls back to
+    a default system font (DejaVu Sans) and the clip renders in the wrong
+    typeface. Read the real name off the file and prefer it.
+
+    Falls back to *declared_name* when the file is missing or unreadable.
+    """
+    path = os.path.join(font_dir, file_name)
+    if not os.path.exists(path):
+        return declared_name
+    try:
+        from PIL import ImageFont
+
+        family, _style = ImageFont.truetype(path, 20).getname()
+        return family or declared_name
+    except Exception:
+        return declared_name
+
+
 def siapkan_font_tipografi(cfg):
     """
     Ensure all required typography fonts for the selected style are downloaded and registered.
