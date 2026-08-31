@@ -92,6 +92,10 @@ def run_pipeline(cfg) -> list[dict]:
         _n = engine.apply_transcript_fixes(data_segmen, _fixes)
         print(f"      ✏️ Koreksi transkrip: {_n} penggantian diterapkan.")
 
+    if getattr(cfg, "uppercase", False):
+        _u = engine.uppercase_transcript(data_segmen)
+        print(f"      🔠 Subtitle uppercase: {_u} kata.")
+
     # Step 3 — Gemini AI analysis
     gemini_output_path = os.path.join(cfg.outputs_dir, "gemini_response.json")
     

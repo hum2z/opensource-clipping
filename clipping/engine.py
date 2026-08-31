@@ -231,6 +231,23 @@ def apply_transcript_fixes(data_segmen, fixes):
     return count
 
 
+def uppercase_transcript(data_segmen):
+    """Upper-case every transcribed word in place.
+
+    Short-form caption styles are frequently set in all caps. Doing it on the
+    transcript rather than in the ASS writer means every caption path — plain,
+    karaoke and advanced typography — picks it up without each having to know.
+    """
+    n = 0
+    for seg in data_segmen or []:
+        for w in seg.get("words") or []:
+            txt = w.get("word")
+            if isinstance(txt, str) and txt != txt.upper():
+                w["word"] = txt.upper()
+                n += 1
+    return n
+
+
 def build_download_opts(cfg) -> dict:
     """Collect yt-dlp auth/extraction options from *cfg* into kwargs.
 

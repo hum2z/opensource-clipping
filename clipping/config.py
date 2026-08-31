@@ -367,6 +367,49 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-hook", action="store_true", help="Disable hook glitch teaser")
     p.add_argument("--no-bgm", action="store_true", help="Disable background music")
     p.add_argument(
+        "--caption-preset",
+        choices=["default", "centered-glow"],
+        default="default",
+        help=(
+            "Caption look. 'centered-glow' places captions mid-frame in all "
+            "caps with a lit edge, matching the style common to high-performing "
+            "talking-head Shorts; individual --sub-* flags still override it."
+        ),
+    )
+    p.add_argument(
+        "--sub-align",
+        type=int,
+        default=None,
+        help="ASS alignment for subtitles (2 = bottom centre, 5 = middle centre).",
+    )
+    p.add_argument(
+        "--sub-margin",
+        type=int,
+        default=None,
+        help="Vertical subtitle margin in px at 1080x1920, scaled to the render size.",
+    )
+    p.add_argument(
+        "--sub-glow",
+        type=float,
+        default=None,
+        help=(
+            "Glow radius on subtitles (0 = off). Renders as a lit edge rather "
+            "than a hard black stroke."
+        ),
+    )
+    p.add_argument(
+        "--sub-font-size",
+        type=int,
+        default=None,
+        help="Subtitle font size at 1080x1920, scaled to the render size.",
+    )
+    p.add_argument(
+        "--uppercase",
+        action="store_true",
+        default=False,
+        help="Upper-case all subtitle text.",
+    )
+    p.add_argument(
         "--broll-pool",
         type=int,
         default=5,
@@ -985,6 +1028,29 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         bgm_mode=args.bgm_mode,
         bgm_file=args.bgm_file or None,
         broll_pool=args.broll_pool,
+        caption_preset=args.caption_preset,
+        sub_align=(
+            args.sub_align
+            if args.sub_align is not None
+            else (5 if args.caption_preset == "centered-glow" else None)
+        ),
+        sub_margin=(
+            args.sub_margin
+            if args.sub_margin is not None
+            else (0 if args.caption_preset == "centered-glow" else None)
+        ),
+        sub_glow=(
+            args.sub_glow
+            if args.sub_glow is not None
+            else (11.0 if args.caption_preset == "centered-glow" else 0.0)
+        ),
+        uppercase=args.uppercase or args.caption_preset == "centered-glow",
+        sub_font_size=(
+            args.sub_font_size
+            if args.sub_font_size is not None
+            else (132 if args.caption_preset == "centered-glow" else None)
+        ),
+        sub_glow_outline=2.0,
         bgm_moods=BGM_MOODS,
         bgm_dir=BGM_DIR,
         # Whisper

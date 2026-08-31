@@ -103,6 +103,21 @@ def buat_file_ass(
     outline_val = 3 if pakai_karaoke else 0.2
     shadow_val = 2.5 if pakai_karaoke else 0.2
 
+    # Glow: libass has no style-level blur, so a lit-edge look is built from a
+    # wide outline in the glow colour plus a per-event \blur override. Used by
+    # caption styles where the text should read as emitting light rather than
+    # sitting on a hard black stroke.
+    sub_glow = float(getattr(cfg, "sub_glow", 0) or 0)
+    glow_colour = getattr(cfg, "sub_glow_colour", "&H00FFFFFF")
+    if sub_glow > 0:
+        # Keep the stroke narrow and let \blur do the work. Scaling the outline
+        # with the glow radius instead fattens the letterforms into a slab
+        # before the blur is applied, which reads as a muddy halo rather than
+        # light coming off the text.
+        outline_val = float(getattr(cfg, "sub_glow_outline", 2.0))
+        shadow_val = 0
+    blur_prefix = f"{{\\blur{sub_glow:g}}}" if sub_glow > 0 else ""
+
     daftar_font = cfg.daftar_font
     gaya = cfg.gaya_font_aktif
     font_dir = cfg.font_dir
@@ -145,9 +160,15 @@ def buat_file_ass(
         align = 5
         margin_v = 0
     else:
-        align = cfg.ass_align_916 if _is_vertical_ratio(rasio) else cfg.ass_align_169
-        margin_v = int((cfg.ass_margin_916 if _is_vertical_ratio(rasio) else cfg.ass_margin_169) * scale_factor)
-    font_sz = int((cfg.ass_font_916 if _is_vertical_ratio(rasio) else cfg.ass_font_169) * scale_factor)
+        _align_def = cfg.ass_align_916 if _is_vertical_ratio(rasio) else cfg.ass_align_169
+        _margin_def = cfg.ass_margin_916 if _is_vertical_ratio(rasio) else cfg.ass_margin_169
+        align = int(getattr(cfg, "sub_align", None) or _align_def)
+        _margin_src = getattr(cfg, "sub_margin", None)
+        _margin_src = _margin_def if _margin_src is None else _margin_src
+        margin_v = int(_margin_src * scale_factor)
+    _font_def = cfg.ass_font_916 if _is_vertical_ratio(rasio) else cfg.ass_font_169
+    _font_src = getattr(cfg, "sub_font_size", None) or _font_def
+    font_sz = int(_font_src * scale_factor)
     margin_lr = int((60 if _is_vertical_ratio(rasio) else 40) * scale_factor)
 
     header = (
@@ -159,7 +180,7 @@ def buat_file_ass(
         f"ScaledBorderAndShadow: yes\n\n"
         f"[V4+ Styles]\n"
         f"Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Default,{font_utama},{font_sz},&H00FFFFFF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,{outline_val},{shadow_val},{align},{margin_lr},{margin_lr},{margin_v},1\n\n"
+        f"Style: Default,{font_utama},{font_sz},&H00FFFFFF,{glow_colour if sub_glow > 0 else '&H00000000'},&H80000000,0,0,0,0,100,100,0,0,1,{outline_val},{shadow_val},{align},{margin_lr},{margin_lr},{margin_v},1\n\n"
         f"[Events]\n"
         f"Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
@@ -206,7 +227,7 @@ def buat_file_ass(
                                     )
 
                         f.write(
-                            f"Dialogue: 0,{fmt_time(w_s)},{fmt_time(w_e)},Default,,0,0,0,,{' '.join(text_parts)}\n"
+                            f"Dialogue: 0,{fmt_time(w_s)},{fmt_time(w_e)},Default,,0,0,0,,{blur_prefix}{' '.join(text_parts)}\n"
                         )
         return
 
@@ -392,7 +413,7 @@ def buat_file_ass(
                         f"{{\\an2{pos_tag}{f_tag}{c_tag}{anim_tag}}}{w_data['text']}"
                     )
                     f.write(
-                        f"Dialogue: 0,{fmt_time(seg_s)},{fmt_time(seg_e)},Default,,0,0,0,,{event_text}\n"
+                        f"Dialogue: 0,{fmt_time(seg_s)},{fmt_time(seg_e)},Default,,0,0,0,,{blur_prefix}{event_text}\n"
                     )
 
                 current_y += line["height"] + line_spacing
