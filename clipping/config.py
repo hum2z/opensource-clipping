@@ -247,6 +247,50 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Preferred source download max height. Use 'max' to fetch highest available quality.",
     )
     p.add_argument(
+        "--word-fixes",
+        default="",
+        help=(
+            "Correct known mis-transcriptions before subtitles are burned in, "
+            "as comma-separated pairs: \"shoe out=shootout,rojava=Rahova\". "
+            "Matching ignores case and punctuation; multi-word phrases are "
+            "re-timed across the span they replace."
+        ),
+    )
+    p.add_argument(
+        "--punch-in",
+        action="store_true",
+        default=False,
+        help=(
+            "Manufacture a cut rhythm on single-camera clips by stepping the "
+            "crop between framings on speech boundaries. Vertical ratios only."
+        ),
+    )
+    p.add_argument(
+        "--punch-in-cadence",
+        type=float,
+        default=1.8,
+        help="Target seconds between punch-in cuts (default: 1.8).",
+    )
+    p.add_argument(
+        "--punch-in-levels",
+        default="1.0,1.15,1.08,1.22",
+        help=(
+            "Comma-separated zoom levels cycled by the punch-in cutter "
+            "(default: 1.0,1.15,1.08,1.22). Above ~1.25 softening is visible "
+            "on a 1080p source."
+        ),
+    )
+    p.add_argument(
+        "--target-lufs",
+        type=float,
+        default=None,
+        help=(
+            "Normalise final audio to this integrated loudness, e.g. -10. "
+            "Short-form platforms are mastered far louder than broadcast; "
+            "leaving this unset keeps the source level."
+        ),
+    )
+    p.add_argument(
         "--cookies",
         default=os.environ.get("YTDLP_COOKIES", ""),
         help=(
@@ -856,6 +900,13 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         jumlah_clip=args.clips,
         pilihan_rasio=args.ratio,
         download_source_height=args.source_height,
+        word_fixes=args.word_fixes,
+        use_punch_in=args.punch_in,
+        punch_in_cadence=args.punch_in_cadence,
+        punch_in_levels=tuple(
+            float(x) for x in str(args.punch_in_levels).split(",") if x.strip()
+        ) or (1.0,),
+        target_lufs=args.target_lufs,
         cookies_file=args.cookies or None,
         cookies_from_browser=args.cookies_from_browser or None,
         player_client=args.player_client or None,

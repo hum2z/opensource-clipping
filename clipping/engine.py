@@ -151,6 +151,86 @@ def _apply_auth_opts(
         print(f"      🍪 Memakai cookies dari browser: {cookies_from_browser}", flush=True)
 
 
+def parse_word_fixes(spec):
+    """Parse a ``"wrong=right,wrong phrase=right phrase"`` spec into a list.
+
+    Returns ``[(source_words, replacement_words), ...]``, longest source first
+    so that multi-word phrases win over single-word matches.
+    """
+    fixes = []
+    for pair in str(spec or "").split(","):
+        pair = pair.strip()
+        if not pair or "=" not in pair:
+            continue
+        wrong, right = pair.split("=", 1)
+        src = wrong.strip().lower().split()
+        dst = right.strip().split()
+        if src and dst:
+            fixes.append((src, dst))
+    fixes.sort(key=lambda f: -len(f[0]))
+    return fixes
+
+
+def _norm_word(w):
+    return "".join(ch for ch in str(w).lower() if ch.isalnum())
+
+
+def apply_transcript_fixes(data_segmen, fixes):
+    """Correct known mis-transcriptions in place, preserving word timings.
+
+    Speech-to-text reliably mangles proper nouns and domain jargon — place
+    names, brands, surnames. Left uncorrected these get burned into the
+    subtitles, where they are far more conspicuous than in a plain transcript.
+
+    A multi-word source is replaced across the span it occupied: the
+    replacement words are distributed over the matched words' combined
+    duration, so subtitle timing stays intact whether the phrase gets shorter
+    or longer.
+
+    Returns the number of substitutions made.
+    """
+    if not fixes or not data_segmen:
+        return 0
+    count = 0
+    for seg in data_segmen:
+        words = seg.get("words") or []
+        i = 0
+        out = []
+        while i < len(words):
+            matched = False
+            for src, dst in fixes:
+                n = len(src)
+                if i + n > len(words):
+                    continue
+                window = [_norm_word(words[i + k].get("word", "")) for k in range(n)]
+                if window == [_norm_word(x) for x in src]:
+                    t0 = float(words[i].get("start", 0.0))
+                    t1 = float(words[i + n - 1].get("end", t0))
+                    span = max(t1 - t0, 1e-3)
+                    step = span / len(dst)
+                    # Carry trailing punctuation from the last matched word.
+                    tail = ""
+                    last = str(words[i + n - 1].get("word", ""))
+                    while last and not last[-1].isalnum():
+                        tail = last[-1] + tail
+                        last = last[:-1]
+                    for j, rep in enumerate(dst):
+                        out.append({
+                            "word": rep + (tail if j == len(dst) - 1 else ""),
+                            "start": t0 + j * step,
+                            "end": t0 + (j + 1) * step,
+                        })
+                    i += n
+                    count += 1
+                    matched = True
+                    break
+            if not matched:
+                out.append(words[i])
+                i += 1
+        seg["words"] = out
+    return count
+
+
 def build_download_opts(cfg) -> dict:
     """Collect yt-dlp auth/extraction options from *cfg* into kwargs.
 

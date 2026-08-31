@@ -52,6 +52,8 @@ RATIO_MAP = utils.RATIO_MAP
 
 broll = _load_studio_internal_module("broll.py", "clipping_studio_broll")
 crop_center_broll = broll.crop_center_broll
+
+punch_in = _load_studio_internal_module("punch_in.py", "clipping_studio_punch_in")
 face_detection = _load_studio_internal_module("face_detection.py", "clipping_studio_face_detection")
 get_face_detector = face_detection.get_face_detector
 
@@ -64,6 +66,7 @@ def buat_video_hybrid(
     cfg,
     broll_data=None,
     label="Hybrid",
+    data_segmen=None,
 ):
     """
     Render a hybrid video combining main footage and b-roll with dynamic panning based on face tracking.
@@ -77,6 +80,8 @@ def buat_video_hybrid(
         cfg: Configuration object for parameters like deadzones and smoothing factors.
         broll_data (list, optional): Metadata dicts of B-roll timing to overlay.
         label (str, optional): The UI label used for rendering progress output.
+        data_segmen (list, optional): Transcript segments, used to place
+            punch-in cuts on clause boundaries when ``cfg.use_punch_in`` is set.
 
     Returns:
         callable: A lambda `get_x_final(t)` which returns the dynamic X crop position given a timestamp `t`.
@@ -338,6 +343,21 @@ def buat_video_hybrid(
     TRANSITION_DUR = 0.3
     MAX_ZOOM = 1.10
 
+    # --- Punch-in cut rhythm -------------------------------------------------
+    # Single-camera clips are one locked-off shot; stepping the crop between
+    # framings on speech boundaries manufactures the cut rhythm short-form
+    # video needs. Vertical output only — 16:9 keeps the full frame.
+    punch_plan = []
+    if getattr(cfg, "use_punch_in", False) and _is_vertical_ratio(rasio):
+        punch_plan = punch_in.build_punch_plan(
+            data_segmen,
+            start_clip,
+            start_clip + duration,
+            cadence=getattr(cfg, "punch_in_cadence", punch_in.DEFAULT_CADENCE),
+            levels=getattr(cfg, "punch_in_levels", punch_in.DEFAULT_LEVELS),
+        )
+        print(f"   🎞️ {punch_in.describe_plan(punch_plan)}", flush=True)
+
     try:
         cap.set(cv2.CAP_PROP_POS_MSEC, start_clip * 1000)
         frame_count = 0
@@ -360,9 +380,17 @@ def buat_video_hybrid(
             if _is_vertical_ratio(rasio):
                 # Vertical/square ratios: face-tracked crop
                 cx_base, cy_base = _get_pos(t)
-                x1_crop = int(max(0, min(cx_base - crop_w // 2, width - crop_w)))
-                y1_crop = int(max(0, min(cy_base - crop_h // 2, height - crop_h)))
-                cropped = frame_utama[y1_crop : y1_crop + crop_h, x1_crop : x1_crop + crop_w]
+                cw_eff, ch_eff = crop_w, crop_h
+                if punch_plan:
+                    # Tighter crop = more zoom. Same centre, so the punch-in
+                    # reads as a cut in framing rather than a camera move.
+                    z = punch_in.get_zoom_at(punch_plan, waktu_absolut)
+                    if z > 1.0:
+                        cw_eff = max(16, int(round(crop_w / z)))
+                        ch_eff = max(16, int(round(crop_h / z)))
+                x1_crop = int(max(0, min(cx_base - cw_eff // 2, width - cw_eff)))
+                y1_crop = int(max(0, min(cy_base - ch_eff // 2, height - ch_eff)))
+                cropped = frame_utama[y1_crop : y1_crop + ch_eff, x1_crop : x1_crop + cw_eff]
                 frame_normal = _resize_frame(cropped, (base_out_w, base_out_h))
             else:
                 # 16:9 landscape: fit-to-height with letterbox (no stretch)

@@ -86,6 +86,12 @@ def run_pipeline(cfg) -> list[dict]:
             compute_type=cfg.whisper_compute_type,
         )
 
+    # Step 2.5 — Correct known mis-transcriptions before they reach subtitles
+    _fixes = engine.parse_word_fixes(getattr(cfg, "word_fixes", ""))
+    if _fixes:
+        _n = engine.apply_transcript_fixes(data_segmen, _fixes)
+        print(f"      ✏️ Koreksi transkrip: {_n} penggantian diterapkan.")
+
     # Step 3 — Gemini AI analysis
     gemini_output_path = os.path.join(cfg.outputs_dir, "gemini_response.json")
     

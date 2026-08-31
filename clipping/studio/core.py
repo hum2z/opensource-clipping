@@ -492,6 +492,7 @@ def proses_klip(
                         cfg.file_video_asli, s_silent, s_start, s_end,
                         rasio, cfg, broll_aktif,
                         label=f"Rank {rank} Seg {idx} Hybrid",
+                        data_segmen=data_segmen,
                     )
 
                 # Subtitle for this segment
@@ -627,6 +628,7 @@ def proses_klip(
                     cfg,
                     broll_aktif,
                     label=f"Rank {rank} Main",
+                    data_segmen=data_segmen,
                 )
 
             vo_data = clip.get("voiceover")
@@ -1008,6 +1010,36 @@ def proses_klip(
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+        # LOUDNESS NORMALISATION (full clip)
+        # Short-form platforms sit far louder than broadcast; a clip mastered
+        # at broadcast level reads as quiet and weak next to them in-feed.
+        target_lufs = getattr(cfg, "target_lufs", None)
+        if target_lufs is not None:
+            for final_path, _, _, _ in concat_runs:
+                if not os.path.exists(final_path):
+                    continue
+                tmp_ln = final_path.replace(".mp4", "_ln.mp4")
+                try:
+                    subprocess.run(
+                        [
+                            "ffmpeg", "-y", "-loglevel", "error", "-i", final_path,
+                            "-af", f"loudnorm=I={target_lufs}:LRA=7:TP=-1.0",
+                            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+                            tmp_ln,
+                        ],
+                        check=True,
+                    )
+                    os.replace(tmp_ln, final_path)
+                    print(
+                        f"   🔊 [Loudness] {os.path.basename(final_path)} "
+                        f"dinormalisasi ke {target_lufs} LUFS",
+                        flush=True,
+                    )
+                except subprocess.CalledProcessError as e:
+                    print(f"   ⚠️ [Loudness] Gagal menormalisasi: {e}", flush=True)
+                    if os.path.exists(tmp_ln):
+                        os.remove(tmp_ln)
+
         # EDGE GLOW POST-PROCESSING (full clip)
         if getattr(cfg, "edge_glow", False):
             print("   ✨ [Edge Glow] Applying ambient edge glow to full clip...")
