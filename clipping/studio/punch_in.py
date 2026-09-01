@@ -32,6 +32,10 @@ DEFAULT_LEVELS = (1.0, 1.15, 1.08, 1.22)
 DEFAULT_CADENCE = 1.8
 MIN_SHOT = 0.9
 
+# How far the crop travels across a single shot. Small: the point is continuous
+# movement, not a visible zoom.
+DEFAULT_DRIFT = 0.06
+
 
 def _clause_boundaries(data_segmen, start_clip, end_clip):
     """Times (absolute seconds) where a spoken clause ends, within the clip.
@@ -68,8 +72,9 @@ def build_punch_plan(
     cadence=DEFAULT_CADENCE,
     levels=DEFAULT_LEVELS,
     min_shot=MIN_SHOT,
+    drift=DEFAULT_DRIFT,
 ):
-    """Build a list of ``(t_start, t_end, zoom)`` spans in absolute seconds.
+    """Build ``(t_start, t_end, zoom_start, zoom_end)`` spans in absolute seconds.
 
     Walks forward from *start_clip*, and at each step takes the clause
     boundary nearest to ``cadence`` seconds ahead — so cuts land on speech,
@@ -116,25 +121,43 @@ def build_punch_plan(
             zoom = levels[li % len(levels)]
             li += 1
         prev_zoom = zoom
-        plan.append((a, b, float(zoom)))
+        # Each shot also drifts across its own duration rather than holding a
+        # fixed crop. A locked-off frame between cuts measured ~0.06 px/frame of
+        # global motion against ~2.7 for a high-performing reference — the
+        # reference's camera is never still. Direction alternates so the framing
+        # oscillates instead of creeping ever tighter.
+        direction = 1.0 if (len(plan) % 2 == 0) else -1.0
+        z0 = float(zoom)
+        z1 = float(zoom) + direction * float(drift)
+        z1 = max(1.0, z1)
+        plan.append((a, b, z0, z1))
     return plan
 
 
 def get_zoom_at(plan, t_abs, default=1.0):
-    """Zoom factor active at absolute time *t_abs*."""
+    """Zoom factor at absolute time *t_abs*, interpolated within its shot.
+
+    Linear across the shot: the movement should be steady and barely
+    perceptible frame to frame, not an eased move that calls attention to
+    itself.
+    """
     if not plan:
         return default
-    for a, b, z in plan:
+    for a, b, z0, z1 in plan:
         if a <= t_abs < b:
-            return z
-    return plan[-1][2] if t_abs >= plan[-1][0] else default
+            span = b - a
+            if span <= 0:
+                return z0
+            f = (t_abs - a) / span
+            return z0 + (z1 - z0) * f
+    return plan[-1][3] if t_abs >= plan[-1][0] else default
 
 
 def describe_plan(plan):
     """One-line human summary, for the render log."""
     if not plan:
         return "punch-in: (none)"
-    lens = [b - a for a, b, _ in plan]
+    lens = [b - a for a, b, _z0, _z1 in plan]
     lens_sorted = sorted(lens)
     median = lens_sorted[len(lens_sorted) // 2]
     return (

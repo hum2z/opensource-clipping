@@ -1024,7 +1024,19 @@ def proses_klip(
                     subprocess.run(
                         [
                             "ffmpeg", "-y", "-loglevel", "error", "-i", final_path,
-                            "-af", f"loudnorm=I={target_lufs}:LRA=7:TP=-1.0",
+                            # Compress before normalising. loudnorm sets the
+                            # integrated level but leaves the dynamics alone, so
+                            # quiet stretches still fall away — measured against a
+                            # high-performing reference, its energy floor sat ~9 dB
+                            # higher and its RMS spread was less than half. Lifting
+                            # the floor is what keeps a clip feeling relentless in
+                            # feed rather than merely loud on average.
+                            "-af",
+                            (
+                                "acompressor=threshold=-20dB:ratio=3:attack=5:"
+                                "release=150:makeup=2,"
+                                f"loudnorm=I={target_lufs}:LRA=5:TP=-1.0"
+                            ),
                             "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
                             tmp_ln,
                         ],

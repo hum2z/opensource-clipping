@@ -355,6 +355,7 @@ def buat_video_hybrid(
             start_clip + duration,
             cadence=getattr(cfg, "punch_in_cadence", punch_in.DEFAULT_CADENCE),
             levels=getattr(cfg, "punch_in_levels", punch_in.DEFAULT_LEVELS),
+            drift=getattr(cfg, "punch_in_drift", punch_in.DEFAULT_DRIFT),
         )
         print(f"   🎞️ {punch_in.describe_plan(punch_plan)}", flush=True)
 

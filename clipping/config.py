@@ -281,6 +281,26 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--punch-in-drift",
+        type=float,
+        default=0.06,
+        help=(
+            "How far the crop travels across a single shot (default: 0.06). "
+            "Keeps the frame continuously moving; a locked-off frame reads as "
+            "static next to short-form video that never sits still."
+        ),
+    )
+    p.add_argument(
+        "--bgm-volume",
+        type=float,
+        default=None,
+        help=(
+            "Background music level, 0-1 (default: 0.25). Higher levels keep "
+            "energy up through pauses; high-performing Shorts hold a much "
+            "flatter loudness floor than a clip with music only under speech."
+        ),
+    )
+    p.add_argument(
         "--target-lufs",
         type=float,
         default=None,
@@ -966,6 +986,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         word_fixes=args.word_fixes,
         use_punch_in=args.punch_in,
         punch_in_cadence=args.punch_in_cadence,
+        punch_in_drift=args.punch_in_drift,
         punch_in_levels=tuple(
             float(x) for x in str(args.punch_in_levels).split(",") if x.strip()
         ) or (1.0,),
@@ -1024,7 +1045,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         url_glitch_video=URL_GLITCH_VIDEO,
         url_mediapipe_model=URL_MEDIAPIPE_MODEL,
         # BGM
-        bgm_base_volume=BGM_BASE_VOLUME,
+        bgm_base_volume=(args.bgm_volume if args.bgm_volume is not None else BGM_BASE_VOLUME),
         bgm_mode=args.bgm_mode,
         bgm_file=args.bgm_file or None,
         broll_pool=args.broll_pool,
